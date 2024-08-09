@@ -1,4 +1,4 @@
-name: Build
+name: Build and Deploy MonoGame.Framework.WindowsDX
 
 on: [push, pull_request]
 
@@ -41,17 +41,18 @@ jobs:
               fi
         shell: bash
 
-      - name: Build
-        run: dotnet run --project build/Build.csproj -- --target=Default
+      - name: Build MonoGame.Framework.WindowsDX
+        run: dotnet build --configuration Release ./MonoGame.Framework.WindowsDX.sln
 
       - name: Expose GitHub Runtime
         uses: crazy-max/ghaction-github-runtime@v3
 
       - name: Upload Artifacts
-        run: dotnet run --project build/Build.csproj -- --target=UploadArtifacts
+        run: dotnet pack --configuration Release --output ./nupkg ./MonoGame.Framework.WindowsDX.sln
         env:
           ACTIONS_RUNTIME_TOKEN: ${{ env.ACTIONS_RUNTIME_TOKEN }}
           ACTIONS_RUNTIME_URL: "${{ env.ACTIONS_RUNTIME_URL }}"
+
   deploy:
       name: Deploy
       needs: [ build ]
@@ -72,7 +73,12 @@ jobs:
           - name: Expose GitHub Runtime
             uses: crazy-max/ghaction-github-runtime@v3
 
-          - name: Push GitHub Nugets
-            run: dotnet run --project build/Build.csproj -- --target=DeployNuGetsToGithub
+          - name: Push GitHub NuGets
+            run: dotnet nuget push ./nupkg/*.nupkg -k ${{ secrets.GITHUB_TOKEN }} --skip-duplicate -s https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
             env:
               GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          - name: Publish to nuget.org
+            run: dotnet nuget push ./nupkg/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+            env:
+              NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
